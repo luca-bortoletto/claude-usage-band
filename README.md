@@ -52,4 +52,4 @@ then Plugins, Add marketplace with `ste88/claude-usage-band`, then Add plugin.
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE). Changes by version are in [CHANGELOG.md](CHANGELOG.md).
