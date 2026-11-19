@@ -31,3 +31,7 @@ claude plugin install usage-band --marketplace ste88/claude-usage-band
 
 In the desktop app, where `/plugin` does not run: click + next to the prompt box,
 then Plugins, Add marketplace with `ste88/claude-usage-band`, then Add plugin.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
