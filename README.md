@@ -50,34 +50,6 @@ claude plugin install usage-band --marketplace ste88/claude-usage-band
 In the desktop app, where `/plugin` does not run: click + next to the prompt box,
 then Plugins, Add marketplace with `ste88/claude-usage-band`, then Add plugin.
 
-## Develop from a local clone
-
-Add the clone as a marketplace and install from it. Its entry points at `./`, so
-Claude Code reads the plugin straight from the folder, in every new session,
-terminal and desktop app alike:
-
-```bash
-claude plugin marketplace add ~/Projects/usage-band
-claude plugin install usage-band@claude-usage-band
-```
-
-After editing a file, run `/reload-plugins` in an open session (no new version or
-reinstall needed); `claude plugin list` shows the folder it is read from.
-
-To load the folder without installing it, start a single session with
-`claude --plugin-dir ~/Projects/usage-band`, or name it in the `env` block of
-`~/.claude/settings.json` to have it in every session:
-
-```json
-{ "env": { "CLAUDE_CODE_PLUGIN_DIRS": "/home/<you>/Projects/usage-band" } }
-```
-
-Use one of the two, not both, or the band is loaded twice.
-
-A mod Claude writes for you lands in that session's own mods folder
-(`~/.claude/dev-mods/<session-id>/`) and loads only in that session: copy it
-here and install it as above to see it everywhere.
-
 ## License
 
 MIT, see [LICENSE](LICENSE).
