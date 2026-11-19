@@ -1,18 +1,32 @@
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
-import type { UsageSnapshot, UsageWindow } from '../types'
+import type { ThemeName, UsageSnapshot, UsageWindow } from '../types'
 
 const snapshot = atom({ plugin: 'usage-band', key: 'snapshot' } as const, null)
 const warned = atom({ plugin: 'usage-band', key: 'warned' } as const, [])
+const theme = atom({ plugin: 'usage-band', key: 'theme' } as const, 'classic')
+
+const THEMES: Record<ThemeName, string> = {
+  classic: 'text bars ▓░, compact (default)',
+  visual: 'solid colored bars, bold figures',
+  minimal: 'figures only, no bars',
+}
+
+const isTheme = (value: unknown): value is ThemeName =>
+  typeof value === 'string' && Object.hasOwn(THEMES, value)
 
 const LABELS: Record<string, string> = { five_hour: '5h', seven_day: '7g', spend_limit: 'spesa' }
 
 const label = (kind: string) => LABELS[kind] ?? kind
 
-const bar = (pct: number) => {
-  const filled = Math.max(0, Math.min(10, Math.round(pct / 10)))
-  return '▓'.repeat(filled) + '░'.repeat(10 - filled)
+const BAR = 10
+
+const filledCells = (pct: number) => Math.max(0, Math.min(BAR, Math.round(pct / 10)))
+
+const textBar = (pct: number) => {
+  const filled = filledCells(pct)
+  return '▓'.repeat(filled) + '░'.repeat(BAR - filled)
 }
 
 const HOUR = 3_600_000
@@ -54,14 +68,44 @@ const toSnapshot = (rateLimits: UsageWindow[], cost?: { usd: number }): UsageSna
   usd: cost ? cost.usd : null,
 })
 
+type Row = UsageWindow & { left: number | null; pace: Pace | null }
+
+const themeHelp = (current: ThemeName) =>
+  [
+    `Tema attuale: ${current}`,
+    ...Object.entries(THEMES).map(([name, what]) => `  ${name === current ? '●' : '○'} ${name}: ${what}`),
+    'Cambia con /usage-band theme <nome>',
+  ].join('\n')
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const result = await next(e)
+
+    await $.command.register({
+      name: 'usage-band',
+      description: 'Usage bar: /usage-band theme [classic|visual|minimal]',
+    })
+
+    const saved = await $.store.get('theme')
+    if (isTheme(saved)) await update($, theme, () => saved)
+
     const u = await $.session.usage()
     await update($, snapshot, () => toSnapshot(u.rateLimits, u.cost))
     // Keep the countdown moving between turns.
     $.clock.every(60_000, () => $.ui.invalidate('ui.render'))
     return result
+  })
+
+  on('command.run', { command: 'usage-band' }, async ($, e) => {
+    const [sub, name] = e.args.trim().split(/\s+/)
+    const current = await read($, theme)
+
+    if (sub !== 'theme' || !name) return { text: themeHelp(current) }
+    if (!isTheme(name)) return { text: `Tema sconosciuto: ${name}\n${themeHelp(current)}` }
+
+    await $.store.set('theme', name)
+    await update($, theme, () => name)
+    return { text: `Tema della barra: ${name}` }
   })
 
   on('session.measure', async ($, e, next) => {
@@ -87,26 +131,84 @@ export const register: Register = on => {
 
     const { Box, Text } = $.ui.resolve(e)
     const now = await $.clock.now()
+    const style = await read($, theme)
+
+    const rows: Row[] = snap.windows.map(w => {
+      const at = resetMs(w.resetsAt)
+      const left = at === null ? null : at - now
+      return { ...w, left, pace: pace(w.kind, w.percentUsed, left) }
+    })
+    const cost = snap.usd === null ? null : `$${snap.usd.toFixed(2)}`
+
+    if (style === 'visual') {
+      return (
+        <Box flexDirection="row" gap={2} alignItems="center">
+          {rows.map(w => {
+            const filled = filledCells(w.percentUsed)
+            return (
+              <Box key={w.kind} flexDirection="row" gap={1} alignItems="center">
+                <Text bold>{label(w.kind)}</Text>
+                <Text>
+                  <Text backgroundColor={colorFor(w.percentUsed)}>{' '.repeat(filled)}</Text>
+                  <Text backgroundColor="subtle">{' '.repeat(BAR - filled)}</Text>
+                </Text>
+                <Text bold color={colorFor(w.percentUsed)}>
+                  {w.percentUsed}%
+                </Text>
+                {w.pace ? <Text color={w.pace.color}>{w.pace.symbol}</Text> : null}
+                {w.left !== null ? (
+                  <Text dimColor>
+                    ⟳ {countdown(w.left)}
+                  </Text>
+                ) : null}
+              </Box>
+            )
+          })}
+          {cost ? (
+            <Box flexGrow={1} justifyContent="flex-end">
+              <Text dimColor>
+                sessione {cost}
+              </Text>
+            </Box>
+          ) : null}
+        </Box>
+      )
+    }
+
+    if (style === 'minimal') {
+      return (
+        <Box>
+          <Text dimColor>
+            {rows.map((w, i) => (
+              <Text key={w.kind}>
+                {i > 0 ? ' · ' : ''}
+                {label(w.kind)} <Text color={colorFor(w.percentUsed)}>{w.percentUsed}%</Text>
+                {w.pace ? <Text color={w.pace.color}> {w.pace.symbol}</Text> : null}
+                {w.left !== null ? ` ${countdown(w.left)}` : ''}
+              </Text>
+            ))}
+            {cost ? `${rows.length > 0 ? ' · ' : ''}${cost}` : ''}
+          </Text>
+        </Box>
+      )
+    }
 
     return (
       <Box>
-        {snap.windows.map((w, i) => {
-          const at = resetMs(w.resetsAt)
-          const left = at === null ? null : at - now
-          const p = pace(w.kind, w.percentUsed, left)
-          return (
-            <Text key={w.kind}>
-              {i > 0 ? <Text dimColor> │ </Text> : null}
-              <Text dimColor>{label(w.kind)} </Text>
-              <Text color={colorFor(w.percentUsed)}>{bar(w.percentUsed)} {w.percentUsed}%</Text>
-              {p ? <Text color={p.color}> {p.symbol}</Text> : null}
-              {left !== null ? <Text dimColor> · {countdown(left)}</Text> : null}
+        {rows.map((w, i) => (
+          <Text key={w.kind}>
+            {i > 0 ? <Text dimColor> │ </Text> : null}
+            <Text dimColor>{label(w.kind)} </Text>
+            <Text color={colorFor(w.percentUsed)}>
+              {textBar(w.percentUsed)} {w.percentUsed}%
             </Text>
-          )
-        })}
-        {snap.usd !== null ? (
+            {w.pace ? <Text color={w.pace.color}> {w.pace.symbol}</Text> : null}
+            {w.left !== null ? <Text dimColor> · {countdown(w.left)}</Text> : null}
+          </Text>
+        ))}
+        {cost ? (
           <Text dimColor>
-            {snap.windows.length > 0 ? ' │ ' : ''}sessione ${snap.usd.toFixed(2)}
+            {rows.length > 0 ? ' │ ' : ''}sessione {cost}
           </Text>
         ) : null}
       </Box>

@@ -15,6 +15,15 @@ current session's cost, so you don't have to open `/usage`.
 - Updates by itself after every turn, whenever a window moves a whole point, and
   every minute for the countdown.
 
+## Themes
+
+Pick a look with `/usage-band theme <name>`; the choice is remembered across
+sessions. `/usage-band` alone lists the themes.
+
+- `classic` (default): text bars, compact, as above.
+- `visual`: solid colored bars, bold labels and figures, cost aligned right.
+- `minimal`: figures only, `5h 62% ▲ 2h14m · 7g 31% ▼ 3g5h · $1.84`.
+
 Rate-limit windows appear after the first API response of a session, and only on
 a subscription; otherwise just the session cost is shown.
 
