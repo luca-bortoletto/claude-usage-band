@@ -3,9 +3,9 @@ import { test } from 'node:test'
 
 import { hint } from '../hooks/hint.ts'
 
-test('suggests a lighter model when 5h is high and ahead of the clock', () => {
+test('picks the 5h window when it is high and ahead of the clock', () => {
   const out = hint([{ kind: 'five_hour', percentUsed: 80, ahead: true }])
-  assert.match(out, /5h al 80%/)
+  assert.deepEqual(out, { kind: 'five_hour', percentUsed: 80 })
 })
 
 test('stays quiet when usage is high but on pace', () => {
@@ -21,5 +21,5 @@ test('falls back to the 7-day window', () => {
     { kind: 'five_hour', percentUsed: 10, ahead: false },
     { kind: 'seven_day', percentUsed: 75, ahead: true },
   ])
-  assert.match(out, /7g al 75%/)
+  assert.deepEqual(out, { kind: 'seven_day', percentUsed: 75 })
 })

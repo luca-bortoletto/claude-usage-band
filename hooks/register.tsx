@@ -3,10 +3,14 @@ import type { Register } from 'claude-code'
 
 import type { ThemeName, UsageSnapshot, UsageWindow } from '../types'
 import { hint } from './hint'
+import { detectLang, isLang, LANGS, MESSAGES } from './i18n'
+import type { Lang, Messages } from './i18n'
 
 const snapshot = atom({ plugin: 'usage-band', key: 'snapshot' } as const, null)
 const warned = atom({ plugin: 'usage-band', key: 'warned' } as const, [])
 const theme = atom({ plugin: 'usage-band', key: 'theme' } as const, 'classic')
+// English unless the user picks another language (/usage-band lang <code|auto>).
+const lang = atom({ plugin: 'usage-band', key: 'lang' } as const, 'en')
 // Off by default: the model suggestion is opt-in (/usage-band hint on).
 const hintOn = atom({ plugin: 'usage-band', key: 'hintOn' } as const, false)
 // Written by the refresh timer: the drawing reads it, so each tick redraws.
@@ -23,9 +27,8 @@ const THEMES: Record<ThemeName, string> = {
 const isTheme = (value: unknown): value is ThemeName =>
   typeof value === 'string' && Object.hasOwn(THEMES, value)
 
-const LABELS: Record<string, string> = { five_hour: '5h', seven_day: '7g', spend_limit: 'spesa' }
-
-const label = (kind: string) => LABELS[kind] ?? kind
+const label = (kind: string, m: Messages) =>
+  kind === 'five_hour' || kind === 'seven_day' || kind === 'spend_limit' ? m[kind] : kind
 
 const BAR = 10
 
@@ -45,13 +48,13 @@ const resetMs = (iso?: string) => {
   return Number.isNaN(t) ? null : t
 }
 
-// Time left until the reset: "42m", "2h14m", "3g5h".
-const countdown = (ms: number) => {
+// Time left until the reset: "42m", "2h14m", "3d5h" (the day unit follows the language).
+const countdown = (ms: number, m: Messages) => {
   const minutes = Math.max(0, Math.round(ms / 60_000))
   if (minutes < 60) return `${minutes}m`
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return `${hours}h${String(minutes % 60).padStart(2, '0')}m`
-  return `${Math.floor(hours / 24)}g${hours % 24}h`
+  return `${Math.floor(hours / 24)}${m.day}${hours % 24}h`
 }
 
 type Pace = { symbol: string; color: 'warning' | 'success' | 'subtle' }
@@ -77,11 +80,11 @@ const toSnapshot = (rateLimits: UsageWindow[], cost?: { usd: number }): UsageSna
 
 type Row = UsageWindow & { left: number | null; pace: Pace | null }
 
-const themeHelp = (current: ThemeName) =>
+const themeHelp = (current: ThemeName, m: Messages) =>
   [
-    `Tema attuale: ${current}`,
+    m.themeCurrent(current),
     ...Object.entries(THEMES).map(([name, what]) => `  ${name === current ? '●' : '○'} ${name}: ${what}`),
-    'Cambia con /usage-band <nome>',
+    m.themeChange,
   ].join('\n')
 
 export const register: Register = on => {
@@ -90,12 +93,16 @@ export const register: Register = on => {
 
     await $.command.register({
       name: 'usage-band',
-      description: 'Usage bar: /usage-band [classic|visual|minimal] or /usage-band hint [on|off]',
+      description:
+        'Usage bar: /usage-band [classic|visual|minimal], /usage-band hint [on|off], /usage-band lang [code|auto]',
     })
 
     const saved = await $.store.get('theme')
     if (isTheme(saved)) await update($, theme, () => saved)
     if ((await $.store.get('hint')) === true) await update($, hintOn, () => true)
+    const savedLang = await $.store.get('lang')
+    if (isLang(savedLang)) await update($, lang, () => savedLang)
+    else if (savedLang === 'auto') await update($, lang, () => detectLang())
 
     const refresh = async () => {
       // The figures of the last API response, mid-turn included: free to read.
@@ -113,34 +120,48 @@ export const register: Register = on => {
     // Both "/usage-band theme visual" and "/usage-band visual".
     const name = words[0] === 'theme' ? words[1] : words[0]
     const current = await read($, theme)
+    const m = MESSAGES[await read($, lang)]
+
+    if (words[0] === 'lang') {
+      const arg = words[1]?.toLowerCase()
+      if (!arg) {
+        return { text: `${m.langCurrent(m.name)}\n${m.langChange}\n${LANGS.join(', ')}, auto` }
+      }
+      const next: Lang | null = arg === 'auto' ? detectLang() : isLang(arg) ? arg : null
+      if (next === null) return { text: `${m.langUnknown(arg)}\n${LANGS.join(', ')}, auto` }
+      await $.store.set('lang', arg)
+      await update($, lang, () => next)
+      return { text: MESSAGES[next].langSet(MESSAGES[next].name) }
+    }
 
     if (words[0] === 'hint') {
       const arg = words[1]
       if (arg !== 'on' && arg !== 'off') {
         const state = (await read($, hintOn)) ? 'on' : 'off'
-        return { text: `Suggerimento modello: ${state}\nCambia con /usage-band hint on|off` }
+        return { text: `${m.hintState(state)}\n${m.hintChange}` }
       }
       await $.store.set('hint', arg === 'on')
       await update($, hintOn, () => arg === 'on')
-      return { text: `Suggerimento modello: ${arg}` }
+      return { text: m.hintState(arg) }
     }
 
-    if (!name) return { text: themeHelp(current) }
-    if (!isTheme(name)) return { text: `Tema sconosciuto: ${name}\n${themeHelp(current)}` }
+    if (!name) return { text: themeHelp(current, m) }
+    if (!isTheme(name)) return { text: `${m.themeUnknown(name)}\n${themeHelp(current, m)}` }
 
     await $.store.set('theme', name)
     await update($, theme, () => name)
-    return { text: `Tema della barra: ${name}` }
+    return { text: m.themeSet(name) }
   })
 
   on('session.measure', async ($, e, next) => {
     await update($, snapshot, () => toSnapshot(e.rateLimits, e.cost))
 
     const already = await read($, warned)
+    const m = MESSAGES[await read($, lang)]
     for (const w of e.rateLimits) {
       const key = `${w.kind}@${w.resetsAt ?? ''}`
       if (w.percentUsed >= 90 && !already.includes(key)) {
-        $.ui.toast(`Utilizzo ${label(w.kind)} al ${w.percentUsed}%`)
+        $.ui.toast(m.usageToast(label(w.kind, m), w.percentUsed))
         await update($, warned, list => [...list, key])
       }
     }
@@ -158,6 +179,7 @@ export const register: Register = on => {
     await read($, tick)
     const now = await $.clock.now()
     const style = await read($, theme)
+    const m = MESSAGES[await read($, lang)]
 
     const rows: Row[] = snap.windows.map(w => {
       const at = resetMs(w.resetsAt)
@@ -166,9 +188,10 @@ export const register: Register = on => {
     })
     const cost = snap.usd === null ? null : `$${snap.usd.toFixed(2)}`
 
-    const suggestion = (await read($, hintOn))
+    const tight = (await read($, hintOn))
       ? hint(rows.map(w => ({ kind: w.kind, percentUsed: w.percentUsed, ahead: w.pace?.symbol === '▲' })))
       : null
+    const suggestion = tight ? m.hintTight(label(tight.kind, m), tight.percentUsed) : null
     const finish = <T,>(band: T) =>
       suggestion ? (
         <Box flexDirection="column">
@@ -186,7 +209,7 @@ export const register: Register = on => {
             const filled = filledCells(w.percentUsed)
             return (
               <Box key={w.kind} flexDirection="row" gap={1} alignItems="center">
-                <Text bold>{label(w.kind)}</Text>
+                <Text bold>{label(w.kind, m)}</Text>
                 <Text>
                   <Text backgroundColor={colorFor(w.percentUsed)}>{' '.repeat(filled)}</Text>
                   <Text backgroundColor="subtle">{' '.repeat(BAR - filled)}</Text>
@@ -197,7 +220,7 @@ export const register: Register = on => {
                 {w.pace ? <Text color={w.pace.color}>{w.pace.symbol}</Text> : null}
                 {w.left !== null ? (
                   <Text dimColor>
-                    ⟳ {countdown(w.left)}
+                    ⟳ {countdown(w.left, m)}
                   </Text>
                 ) : null}
               </Box>
@@ -206,7 +229,7 @@ export const register: Register = on => {
           {cost ? (
             <Box flexGrow={1} justifyContent="flex-end">
               <Text dimColor>
-                sessione {cost}
+                {m.session} {cost}
               </Text>
             </Box>
           ) : null}
@@ -221,9 +244,9 @@ export const register: Register = on => {
             {rows.map((w, i) => (
               <Text key={w.kind}>
                 {i > 0 ? ' · ' : ''}
-                {label(w.kind)} <Text color={colorFor(w.percentUsed)}>{w.percentUsed}%</Text>
+                {label(w.kind, m)} <Text color={colorFor(w.percentUsed)}>{w.percentUsed}%</Text>
                 {w.pace ? <Text color={w.pace.color}> {w.pace.symbol}</Text> : null}
-                {w.left !== null ? ` ${countdown(w.left)}` : ''}
+                {w.left !== null ? ` ${countdown(w.left, m)}` : ''}
               </Text>
             ))}
             {cost ? `${rows.length > 0 ? ' · ' : ''}${cost}` : ''}
@@ -237,17 +260,17 @@ export const register: Register = on => {
         {rows.map((w, i) => (
           <Text key={w.kind}>
             {i > 0 ? <Text dimColor> │ </Text> : null}
-            <Text dimColor>{label(w.kind)} </Text>
+            <Text dimColor>{label(w.kind, m)} </Text>
             <Text color={colorFor(w.percentUsed)}>
               {textBar(w.percentUsed)} {w.percentUsed}%
             </Text>
             {w.pace ? <Text color={w.pace.color}> {w.pace.symbol}</Text> : null}
-            {w.left !== null ? <Text dimColor> · {countdown(w.left)}</Text> : null}
+            {w.left !== null ? <Text dimColor> · {countdown(w.left, m)}</Text> : null}
           </Text>
         ))}
         {cost ? (
           <Text dimColor>
-            {rows.length > 0 ? ' │ ' : ''}sessione {cost}
+            {rows.length > 0 ? ' │ ' : ''}{m.session} {cost}
           </Text>
         ) : null}
       </Box>

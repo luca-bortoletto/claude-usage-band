@@ -5,7 +5,7 @@ A Claude Code mod that keeps your usage in view: a row above the prompt shows th
 current session's cost, so you don't have to open `/usage`.
 
 ```
-5h ▓▓▓▓▓▓░░░░ 62% ▲ · 2h14m │ 7g ▓▓▓░░░░░░░ 31% ▼ · 3g5h │ sessione $1.84
+5h ▓▓▓▓▓▓░░░░ 62% ▲ · 2h14m │ 7d ▓▓▓░░░░░░░ 31% ▼ · 3d5h │ session $1.84
 ```
 
 - Green below 70%, yellow from 70%, red from 90%.
@@ -31,7 +31,25 @@ current one.
 
 - `classic` (default): text bars, compact, as above.
 - `visual`: solid colored bars, bold labels and figures, cost aligned right.
-- `minimal`: figures only, `5h 62% ▲ 2h14m · 7g 31% ▼ 3g5h · $1.84`.
+- `minimal`: figures only, `5h 62% ▲ 2h14m · 7d 31% ▼ 3d5h · $1.84`.
+
+## Language
+
+English by default. `/usage-band lang <code>` switches the labels, messages and
+suggestions; `/usage-band lang auto` follows the system language, falling back to
+English. The choice is remembered across sessions. `/usage-band lang` alone shows
+the current language.
+
+| Code | Language   | Code | Language   |
+| ---- | ---------- | ---- | ---------- |
+| `en` | English    | `es` | Español    |
+| `de` | Deutsch    | `pt` | Português  |
+| `fr` | Français   | `nl` | Nederlands |
+| `it` | Italiano   | `pl` | Polski     |
+
+The translations were machine-written: corrections from native speakers are
+welcome. To add a language, add an entry to `MESSAGES` in `hooks/i18n.ts`; the
+tests check that it has every key.
 
 ## Model hint
 

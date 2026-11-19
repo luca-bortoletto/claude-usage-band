@@ -1,16 +1,15 @@
 export type HintWindow = { kind: string; percentUsed: number; ahead: boolean }
+export type Hint = { kind: string; percentUsed: number }
 
 const THRESHOLD = 70
 
-// Suggests a lighter model when a window runs out before it resets.
+// Picks the window that justifies suggesting a lighter model: at or above the
+// threshold and ahead of the clock. The caller words the message in its language.
 // Only uses what the band already has: no prompt text, no model name.
-export const hint = (windows: HintWindow[]): string | null => {
+export const hint = (windows: HintWindow[]): Hint | null => {
   const tight = (kind: string) =>
     windows.find(w => w.kind === kind && w.ahead && w.percentUsed >= THRESHOLD)
 
-  const five = tight('five_hour')
-  if (five) return `5h al ${five.percentUsed}% e in anticipo: valuta un modello più leggero`
-  const seven = tight('seven_day')
-  if (seven) return `7g al ${seven.percentUsed}% e in anticipo: valuta un modello più leggero`
-  return null
+  const found = tight('five_hour') ?? tight('seven_day')
+  return found ? { kind: found.kind, percentUsed: found.percentUsed } : null
 }

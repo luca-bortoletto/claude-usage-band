@@ -9,6 +9,13 @@ All notable changes to usage-band are listed here. The format follows
 ### Added
 - `/usage-band hint on|off`: optional line suggesting a lighter model when a
   window is at 70% or more and ahead of the clock. Off by default.
+- `/usage-band lang <code|auto>`: English, German, French, Italian, Spanish,
+  Portuguese, Dutch and Polish.
+
+### Changed
+- All text is now English by default (it was a mix of Italian and English):
+  `7d` instead of `7g`, `3d5h` instead of `3g5h`, `session` instead of
+  `sessione`. Italian is one command away: `/usage-band lang it`.
 
 ## [0.3.1] - 2026-11-19
 
