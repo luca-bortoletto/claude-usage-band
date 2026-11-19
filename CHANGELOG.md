@@ -4,6 +4,12 @@ All notable changes to usage-band are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- `/usage-band hint on|off`: optional line suggesting a lighter model when a
+  window is at 70% or more and ahead of the clock. Off by default.
+
 ## [0.3.1] - 2026-11-19
 
 ### Added

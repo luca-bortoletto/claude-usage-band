@@ -2,10 +2,13 @@ import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
 import type { ThemeName, UsageSnapshot, UsageWindow } from '../types'
+import { hint } from './hint'
 
 const snapshot = atom({ plugin: 'usage-band', key: 'snapshot' } as const, null)
 const warned = atom({ plugin: 'usage-band', key: 'warned' } as const, [])
 const theme = atom({ plugin: 'usage-band', key: 'theme' } as const, 'classic')
+// Off by default: the model suggestion is opt-in (/usage-band hint on).
+const hintOn = atom({ plugin: 'usage-band', key: 'hintOn' } as const, false)
 // Written by the refresh timer: the drawing reads it, so each tick redraws.
 const tick = atom({ plugin: 'usage-band', key: 'tick' } as const, 0)
 
@@ -87,11 +90,12 @@ export const register: Register = on => {
 
     await $.command.register({
       name: 'usage-band',
-      description: 'Usage bar theme: /usage-band [classic|visual|minimal]',
+      description: 'Usage bar: /usage-band [classic|visual|minimal] or /usage-band hint [on|off]',
     })
 
     const saved = await $.store.get('theme')
     if (isTheme(saved)) await update($, theme, () => saved)
+    if ((await $.store.get('hint')) === true) await update($, hintOn, () => true)
 
     const refresh = async () => {
       // The figures of the last API response, mid-turn included: free to read.
@@ -109,6 +113,17 @@ export const register: Register = on => {
     // Both "/usage-band theme visual" and "/usage-band visual".
     const name = words[0] === 'theme' ? words[1] : words[0]
     const current = await read($, theme)
+
+    if (words[0] === 'hint') {
+      const arg = words[1]
+      if (arg !== 'on' && arg !== 'off') {
+        const state = (await read($, hintOn)) ? 'on' : 'off'
+        return { text: `Suggerimento modello: ${state}\nCambia con /usage-band hint on|off` }
+      }
+      await $.store.set('hint', arg === 'on')
+      await update($, hintOn, () => arg === 'on')
+      return { text: `Suggerimento modello: ${arg}` }
+    }
 
     if (!name) return { text: themeHelp(current) }
     if (!isTheme(name)) return { text: `Tema sconosciuto: ${name}\n${themeHelp(current)}` }
@@ -151,8 +166,21 @@ export const register: Register = on => {
     })
     const cost = snap.usd === null ? null : `$${snap.usd.toFixed(2)}`
 
+    const suggestion = (await read($, hintOn))
+      ? hint(rows.map(w => ({ kind: w.kind, percentUsed: w.percentUsed, ahead: w.pace?.symbol === '▲' })))
+      : null
+    const finish = <T,>(band: T) =>
+      suggestion ? (
+        <Box flexDirection="column">
+          {band}
+          <Text color="warning">{suggestion}</Text>
+        </Box>
+      ) : (
+        band
+      )
+
     if (style === 'visual') {
-      return (
+      return finish(
         <Box flexDirection="row" gap={2} alignItems="center">
           {rows.map(w => {
             const filled = filledCells(w.percentUsed)
@@ -187,7 +215,7 @@ export const register: Register = on => {
     }
 
     if (style === 'minimal') {
-      return (
+      return finish(
         <Box>
           <Text dimColor>
             {rows.map((w, i) => (
@@ -204,7 +232,7 @@ export const register: Register = on => {
       )
     }
 
-    return (
+    return finish(
       <Box>
         {rows.map((w, i) => (
           <Text key={w.kind}>

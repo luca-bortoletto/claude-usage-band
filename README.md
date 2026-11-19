@@ -33,6 +33,13 @@ current one.
 - `visual`: solid colored bars, bold labels and figures, cost aligned right.
 - `minimal`: figures only, `5h 62% ▲ 2h14m · 7g 31% ▼ 3g5h · $1.84`.
 
+## Model hint
+
+Off by default. `/usage-band hint on` adds a line under the band when the 5h or
+7-day window is at 70% or more and ahead of the clock (▲), suggesting a lighter
+model. It only uses the figures the band already shows. `/usage-band hint off`
+turns it off; the choice is remembered across sessions.
+
 ## Install
 
 At the prompt of a Claude Code terminal session:
