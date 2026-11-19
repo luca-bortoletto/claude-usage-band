@@ -15,17 +15,23 @@ current session's cost, so you don't have to open `/usage`.
 - Updates by itself after every turn, whenever a window moves a whole point, and
   every 30 seconds, mid-turn included.
 
+Rate-limit windows appear after the first API response of a session, and only on
+a subscription; otherwise just the session cost is shown.
+
+The percentages come from the API responses of the session the bar is in: usage
+spent from another session or from claude.ai shows up here with this session's
+next response. The 30-second refresh only re-reads figures Claude Code already
+holds, so it sends no request and spends no tokens or usage.
+
 ## Themes
 
-Pick a look with `/usage-band <name>` (or `/usage-band theme <name>`); the choice is remembered across
-sessions. `/usage-band` alone lists the themes.
+Pick a look with `/usage-band <name>` (or `/usage-band theme <name>`); the choice
+is remembered across sessions. `/usage-band` alone lists the themes and marks the
+current one.
 
 - `classic` (default): text bars, compact, as above.
 - `visual`: solid colored bars, bold labels and figures, cost aligned right.
 - `minimal`: figures only, `5h 62% ▲ 2h14m · 7g 31% ▼ 3g5h · $1.84`.
-
-Rate-limit windows appear after the first API response of a session, and only on
-a subscription; otherwise just the session cost is shown.
 
 ## Install
 
