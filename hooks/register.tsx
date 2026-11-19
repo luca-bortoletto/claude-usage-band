@@ -15,16 +15,36 @@ const bar = (pct: number) => {
   return '▓'.repeat(filled) + '░'.repeat(10 - filled)
 }
 
-const DAYS = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab']
-const pad = (n: number) => String(n).padStart(2, '0')
+const HOUR = 3_600_000
+const WINDOW_MS: Record<string, number> = { five_hour: 5 * HOUR, seven_day: 7 * 24 * HOUR }
 
-const resetText = (now: number, iso?: string) => {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`
-  const sameDay = d.toDateString() === new Date(now).toDateString()
-  return sameDay ? hm : `${DAYS[d.getDay()] ?? ''} ${hm}`
+const resetMs = (iso?: string) => {
+  if (!iso) return null
+  const t = new Date(iso).getTime()
+  return Number.isNaN(t) ? null : t
+}
+
+// Time left until the reset: "42m", "2h14m", "3g5h".
+const countdown = (ms: number) => {
+  const minutes = Math.max(0, Math.round(ms / 60_000))
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h${String(minutes % 60).padStart(2, '0')}m`
+  return `${Math.floor(hours / 24)}g${hours % 24}h`
+}
+
+type Pace = { symbol: string; color: 'warning' | 'success' | 'subtle' }
+
+// Compares the share of the window used with the share of time already gone:
+// ahead of the clock means the window runs out before it resets.
+const pace = (kind: string, pct: number, left: number | null): Pace | null => {
+  const length = WINDOW_MS[kind]
+  if (length === undefined || left === null) return null
+  const elapsed = 100 * (1 - Math.min(length, Math.max(0, left)) / length)
+  const gap = pct - elapsed
+  if (gap > 5) return { symbol: '▲', color: 'warning' }
+  if (gap < -5) return { symbol: '▼', color: 'success' }
+  return { symbol: '=', color: 'subtle' }
 }
 
 const colorFor = (pct: number) => (pct >= 90 ? 'error' : pct >= 70 ? 'warning' : 'success')
@@ -39,6 +59,8 @@ export const register: Register = on => {
     const result = await next(e)
     const u = await $.session.usage()
     await update($, snapshot, () => toSnapshot(u.rateLimits, u.cost))
+    // Keep the countdown moving between turns.
+    $.clock.every(60_000, () => $.ui.invalidate('ui.render'))
     return result
   })
 
@@ -69,13 +91,16 @@ export const register: Register = on => {
     return (
       <Box>
         {snap.windows.map((w, i) => {
-          const reset = resetText(now, w.resetsAt)
+          const at = resetMs(w.resetsAt)
+          const left = at === null ? null : at - now
+          const p = pace(w.kind, w.percentUsed, left)
           return (
             <Text key={w.kind}>
               {i > 0 ? <Text dimColor> │ </Text> : null}
               <Text dimColor>{label(w.kind)} </Text>
               <Text color={colorFor(w.percentUsed)}>{bar(w.percentUsed)} {w.percentUsed}%</Text>
-              {reset ? <Text dimColor> · reset {reset}</Text> : null}
+              {p ? <Text color={p.color}> {p.symbol}</Text> : null}
+              {left !== null ? <Text dimColor> · {countdown(left)}</Text> : null}
             </Text>
           )
         })}
