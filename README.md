@@ -50,6 +50,10 @@ claude plugin install usage-band --marketplace ste88/claude-usage-band
 In the desktop app, where `/plugin` does not run: click + next to the prompt box,
 then Plugins, Add marketplace with `ste88/claude-usage-band`, then Add plugin.
 
+The band also works in the Claude Code VS Code extension: install it from a
+shell with the command above, then reload the window. All three themes render
+above the prompt.
+
 ## License
 
 MIT, see [LICENSE](LICENSE). Changes by version are in [CHANGELOG.md](CHANGELOG.md).
