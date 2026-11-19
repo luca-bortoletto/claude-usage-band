@@ -4,6 +4,6 @@ export type ThemeName = 'classic' | 'visual' | 'minimal'
 
 declare module 'claude-code' {
   interface PluginState {
-    'usage-band': { snapshot: UsageSnapshot | null; warned: string[]; theme: ThemeName }
+    'usage-band': { snapshot: UsageSnapshot | null; warned: string[]; theme: ThemeName; tick: number }
   }
 }

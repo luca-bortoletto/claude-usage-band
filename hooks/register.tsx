@@ -6,6 +6,10 @@ import type { ThemeName, UsageSnapshot, UsageWindow } from '../types'
 const snapshot = atom({ plugin: 'usage-band', key: 'snapshot' } as const, null)
 const warned = atom({ plugin: 'usage-band', key: 'warned' } as const, [])
 const theme = atom({ plugin: 'usage-band', key: 'theme' } as const, 'classic')
+// Written by the refresh timer: the drawing reads it, so each tick redraws.
+const tick = atom({ plugin: 'usage-band', key: 'tick' } as const, 0)
+
+const REFRESH_MS = 30_000
 
 const THEMES: Record<ThemeName, string> = {
   classic: 'text bars ▓░, compact (default)',
@@ -74,7 +78,7 @@ const themeHelp = (current: ThemeName) =>
   [
     `Tema attuale: ${current}`,
     ...Object.entries(THEMES).map(([name, what]) => `  ${name === current ? '●' : '○'} ${name}: ${what}`),
-    'Cambia con /usage-band theme <nome>',
+    'Cambia con /usage-band <nome>',
   ].join('\n')
 
 export const register: Register = on => {
@@ -83,24 +87,30 @@ export const register: Register = on => {
 
     await $.command.register({
       name: 'usage-band',
-      description: 'Usage bar: /usage-band theme [classic|visual|minimal]',
+      description: 'Usage bar theme: /usage-band [classic|visual|minimal]',
     })
 
     const saved = await $.store.get('theme')
     if (isTheme(saved)) await update($, theme, () => saved)
 
-    const u = await $.session.usage()
-    await update($, snapshot, () => toSnapshot(u.rateLimits, u.cost))
-    // Keep the countdown moving between turns.
-    $.clock.every(60_000, () => $.ui.invalidate('ui.render'))
+    const refresh = async () => {
+      // The figures of the last API response, mid-turn included: free to read.
+      const u = await $.session.usage()
+      await update($, snapshot, () => toSnapshot(u.rateLimits, u.cost))
+      await update($, tick, n => n + 1)
+    }
+    await refresh()
+    $.clock.every(REFRESH_MS, () => void refresh())
     return result
   })
 
   on('command.run', { command: 'usage-band' }, async ($, e) => {
-    const [sub, name] = e.args.trim().split(/\s+/)
+    const words = e.args.trim().split(/\s+/).filter(Boolean)
+    // Both "/usage-band theme visual" and "/usage-band visual".
+    const name = words[0] === 'theme' ? words[1] : words[0]
     const current = await read($, theme)
 
-    if (sub !== 'theme' || !name) return { text: themeHelp(current) }
+    if (!name) return { text: themeHelp(current) }
     if (!isTheme(name)) return { text: `Tema sconosciuto: ${name}\n${themeHelp(current)}` }
 
     await $.store.set('theme', name)
@@ -130,6 +140,7 @@ export const register: Register = on => {
     }
 
     const { Box, Text } = $.ui.resolve(e)
+    await read($, tick)
     const now = await $.clock.now()
     const style = await read($, theme)
 

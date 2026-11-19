@@ -28,7 +28,7 @@ for (const theme of ['classic', 'visual', 'minimal'] as const) {
   test(`theme ${theme} draws both windows with pace and countdown`, async ($, on) => {
     setup(on)
     await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
-    const res = await $.command.run({ command: 'usage-band', args: `theme ${theme}` })
+    const res = await $.command.run({ command: 'usage-band', args: theme === 'classic' ? `theme ${theme}` : theme })
     expect(JSON.stringify(res)).toContain(theme)
 
     for (const surface of ['terminal', 'desktop'] as const) {

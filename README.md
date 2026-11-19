@@ -13,11 +13,11 @@ current session's cost, so you don't have to open `/usage`.
   the reset), ▼ you have margin, = on pace.
 - A toast warns once per window when it passes 90%.
 - Updates by itself after every turn, whenever a window moves a whole point, and
-  every minute for the countdown.
+  every 30 seconds, mid-turn included.
 
 ## Themes
 
-Pick a look with `/usage-band theme <name>`; the choice is remembered across
+Pick a look with `/usage-band <name>` (or `/usage-band theme <name>`); the choice is remembered across
 sessions. `/usage-band` alone lists the themes.
 
 - `classic` (default): text bars, compact, as above.
