@@ -6,7 +6,10 @@ All notable changes to usage-band are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-20
+
 ### Added
+- The band works in the Claude Code VS Code extension (documented).
 - `/usage-band hint on|off`: optional line suggesting a lighter model when a
   window is at 70% or more and ahead of the clock. Off by default.
 - `/usage-band lang <code|auto>`: English, German, French, Italian, Spanish,
@@ -52,6 +55,8 @@ All notable changes to usage-band are listed here. The format follows
 - Colors by threshold: green below 70%, yellow from 70%, red from 90%.
 - A toast once per window when it passes 90%.
 
+[Unreleased]: https://github.com/ste88/claude-usage-band/compare/0.4.0...HEAD
+[0.4.0]: https://github.com/ste88/claude-usage-band/compare/0.3.1...0.4.0
 [0.3.1]: https://github.com/ste88/claude-usage-band/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/ste88/claude-usage-band/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/ste88/claude-usage-band/compare/0.1.0...0.2.0
