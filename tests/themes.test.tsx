@@ -39,7 +39,7 @@ for (const theme of ['classic', 'visual', 'minimal'] as const) {
       expect(text).toContain('▲')
       expect(text).toContain('▼')
       expect(text).toContain('2h00m')
-      expect(text).toContain('6g0h')
+      expect(text).toContain('6d0h')
       expect(text).toContain('$1.50')
       await ui.unmount()
     }
